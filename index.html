@@ -52,59 +52,72 @@
       color: #888;
     }
 
+    /* Spinning Cat Embeds */
     .cat-embed-wrapper {
       position: fixed;
-      top: 50%;
-      width: 200px;
-      transform: translateY(-50%);
-      z-index: 0;
+      width: 120px;
       opacity: 0.95;
       animation: spin 6s linear infinite;
+      z-index: 999;
+      pointer-events: none;
     }
 
     .cat-left {
+      top: 50%;
       left: 0;
+      transform: translateY(-50%);
     }
 
     .cat-right {
+      top: 50%;
       right: 0;
+      transform: translateY(-50%);
+    }
+
+    .cat-bottom {
+      display: none;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      position: fixed;
     }
 
     @keyframes spin {
-      0% { transform: translateY(-50%) rotate(0deg); }
-      100% { transform: translateY(-50%) rotate(360deg); }
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
-    /* 📱 Mobile fix */
+    /* 📱 Mobile: hide side cats, show bottom cat */
     @media (max-width: 768px) {
       .cat-left,
       .cat-right {
-        position: absolute;
-        top: auto;
-        bottom: -10px;
-        left: 50%;
-        transform: translateX(-50%) scale(0.7);
+        display: none;
       }
 
-      .cat-right {
-        display: none; /* Hide right cat on mobile */
+      .cat-bottom {
+        display: block;
+        width: 100px;
       }
     }
   </style>
 </head>
 <body>
 
-  <!-- Spinning Cat Embeds -->
+  <!-- Desktop Only Cats -->
   <div class="cat-embed-wrapper cat-left">
-    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host" data-aspect-ratio="1" data-width="100%">
-      <a href="https://tenor.com/view/oia-uia-oia-cat-uia-cat-catcultclassics-gif-12805916815008299407">Oia Uia Sticker</a>
-    </div>
+    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host"
+         data-aspect-ratio="1" data-width="100%"></div>
   </div>
 
   <div class="cat-embed-wrapper cat-right">
-    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host" data-aspect-ratio="1" data-width="100%">
-      <a href="https://tenor.com/view/oia-uia-oia-cat-uia-cat-catcultclassics-gif-12805916815008299407">Oia Uia Sticker</a>
-    </div>
+    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host"
+         data-aspect-ratio="1" data-width="100%"></div>
+  </div>
+
+  <!-- Mobile Only Cat -->
+  <div class="cat-embed-wrapper cat-bottom">
+    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host"
+         data-aspect-ratio="1" data-width="100%"></div>
   </div>
 
   <script type="text/javascript" async src="https://tenor.com/embed.js"></script>
