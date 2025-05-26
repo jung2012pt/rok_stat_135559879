@@ -74,6 +74,22 @@
       0% { transform: translateY(-50%) rotate(0deg); }
       100% { transform: translateY(-50%) rotate(360deg); }
     }
+
+    /* 📱 Mobile fix */
+    @media (max-width: 768px) {
+      .cat-left,
+      .cat-right {
+        position: absolute;
+        top: auto;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%) scale(0.7);
+      }
+
+      .cat-right {
+        display: none; /* Hide right cat on mobile */
+      }
+    }
   </style>
 </head>
 <body>
