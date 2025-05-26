@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Governor Stats Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/webp" href="moai.webp">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      padding: 20px;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      position: relative;
+      z-index: 1;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .data-table th, .data-table td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .data-table th {
+      background-color: #f0f2f5;
+    }
+
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #888;
+    }
+
+    .cat-embed-wrapper {
+      position: fixed;
+      top: 50%;
+      width: 200px;
+      transform: translateY(-50%);
+      z-index: 0;
+      opacity: 0.95;
+      animation: spin 6s linear infinite;
+    }
+
+    .cat-left {
+      left: 0;
+    }
+
+    .cat-right {
+      right: 0;
+    }
+
+    @keyframes spin {
+      0% { transform: translateY(-50%) rotate(0deg); }
+      100% { transform: translateY(-50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Spinning Cat Embeds -->
+  <div class="cat-embed-wrapper cat-left">
+    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host" data-aspect-ratio="1" data-width="100%">
+      <a href="https://tenor.com/view/oia-uia-oia-cat-uia-cat-catcultclassics-gif-12805916815008299407">Oia Uia Sticker</a>
+    </div>
+  </div>
+
+  <div class="cat-embed-wrapper cat-right">
+    <div class="tenor-gif-embed" data-postid="12805916815008299407" data-share-method="host" data-aspect-ratio="1" data-width="100%">
+      <a href="https://tenor.com/view/oia-uia-oia-cat-uia-cat-catcultclassics-gif-12805916815008299407">Oia Uia Sticker</a>
+    </div>
+  </div>
+
+  <script type="text/javascript" async src="https://tenor.com/embed.js"></script>
+
+  <!-- Main Content -->
+  <div class="container">
+    <h1>Governor Stats Viewer</h1>
+    <p>Searching for Governor ID: <strong>135559879</strong></p>
+    <div id="output">Loading...</div>
+  </div>
+
+  <div class="footer">Data provided by prokingdoms.com</div>
+
+  <script>
+    async function fetchGovernorStats() {
+      try {
+        const response = await fetch("https://beta.prokingdoms.com/proxy-fast/stats/kvk/5582", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            searchString: "135559879",
+            pageNumber: 1,
+            isFullTable: false
+          })
+        });
+
+        const data = await response.json();
+        const governor = data.kvkDetailsData[0];
+        const camps = data.campsList;
+        const camp = camps.find(c => c.id === governor.campid)?.iconName || "Unknown";
+
+        const output = `
+          <table class="data-table">
+            <tr><th>Rank</th><td>${governor.rank}</td></tr>
+            <tr><th>Name</th><td>${governor.name}</td></tr>
+            <tr><th>Governor ID</th><td>${governor.governor_id}</td></tr>
+            <tr><th>Kingdom</th><td>${governor.kingdom}</td></tr>
+            <tr><th>Camp</th><td>${camp}</td></tr>
+            <tr><th>Min Points</th><td>${Number(governor.min_points).toLocaleString()}</td></tr>
+            <tr><th>Max Points</th><td>${Number(governor.max_points).toLocaleString()}</td></tr>
+            <tr><th>KP gain (Max Points - Min Points)</th><td style="color: red;">${Number(governor.points_difference).toLocaleString()}</td></tr>
+            <tr><th>Min Power</th><td>${Number(governor.min_power).toLocaleString()}</td></tr>
+            <tr><th>Max Power</th><td>${Number(governor.max_power).toLocaleString()}</td></tr>
+            <tr><th>Power Difference</th><td>${Number(governor.power_difference).toLocaleString()}</td></tr>
+            <tr><th>First Update</th><td>${governor.first_update}</td></tr>
+            <tr><th>Last Update</th><td>${governor.last_update}</td></tr>
+            <tr><th>Is Premium</th><td>${governor.is_premium ? "Yes" : "No"}</td></tr>
+            <tr><th>KVK Name</th><td>${data.kvkName}</td></tr>
+            <tr><th>KVK Story</th><td>${data.kvkStory}</td></tr>
+          </table>
+        `;
+
+        document.getElementById("output").innerHTML = output;
+      } catch (error) {
+        document.getElementById("output").innerText = "Failed to load data.";
+        console.error(error);
+      }
+    }
+
+    fetchGovernorStats();
+  </script>
+</body>
+</html>
