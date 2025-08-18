@@ -5,131 +5,191 @@
   <title>Governor Stats Viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: Arial, sans-serif; background:#f4f6f9; padding:20px; margin:0; }
-    h1 { color:#333; margin-bottom:6px; }
-    .container { background:#fff; padding:20px; border-radius:12px; max-width:900px; margin:auto; box-shadow:0 0 10px rgba(0,0,0,.08); }
-    .last-updated { color:#555; margin-bottom:14px; font-size:14px; }
-    .data-table { width:100%; border-collapse:collapse; margin-top:14px; }
-    .data-table th, .data-table td { text-align:left; padding:8px 12px; border-bottom:1px solid #e5e7eb; }
-    .data-table th { background:#f0f2f5; width:260px; }
-    .footer { margin-top:22px; text-align:center; color:#888; font-size:13px; }
+    :root{
+      --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; --muted:#6b7280;
+      --border:#e5e7eb; --bg:#f8fafc; --card:#ffffff; --text:#111827;
+      --blue:#2563eb;
+    }
+    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);margin:0;padding:24px;color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto}
+    h1{margin:0 0 8px}
+    .toolbar{display:flex;gap:8px;align-items:center;margin:8px 0 14px}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;border:1px solid}
+    .b-fresh{color:var(--ok);border-color:var(--ok);background:#ecfdf5}
+    .b-stale{color:var(--warn);border-color:var(--warn);background:#fffbeb}
+    .b-dead{color:var(--bad);border-color:var(--bad);background:#fef2f2}
+    .b-info{color:var(--blue);border-color:var(--blue);background:#eff6ff}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .last{color:var(--muted);margin:4px 0 14px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left}
+    th{width:260px;background:#f3f4f6}
+    .num-red{color:#dc2626}
+    .muted{color:var(--muted)}
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="wrap">
     <h1>Governor Stats Viewer</h1>
-    <div id="last-updated" class="last-updated">Last updated: …</div>
-    <p>Searching for Governor ID: <strong>135559879</strong></p>
-    <div id="output">Loading…</div>
+
+    <div class="toolbar">
+      <span id="liveBadge" class="badge b-info">checking…</span>
+      <button id="refreshBtn" class="btn" title="Fetch again">Refresh</button>
+      <span class="badge b-info" title="This uses the per-governor last_update from the live table">source: row time</span>
+    </div>
+
+    <div id="lastLine" class="last">Last updated: …</div>
+
+    <div class="card">
+      <p>Searching for Governor ID: <strong>135559879</strong></p>
+      <div id="output">Loading…</div>
+    </div>
   </div>
-  <div class="footer">Data provided by prokingdoms.com</div>
 
   <script>
-    const GOV_ID = "135559879";
+    const GOV_ID  = "135559879";
     const API_URL = "https://beta.prokingdoms.com/proxy-fast/stats/kvk/5854";
 
-    // --- time helpers (force UTC) ---
-    function parseServerUTC(t) {
-      if (!t) return null;
-      if (typeof t !== "string") return new Date(t);
-      if (t.includes("Z") || /[+\-]\d{2}:\d{2}$/.test(t)) return new Date(t);
-      return new Date(t.replace(" ", "T") + "Z");
+    // Thresholds for freshness (minutes)
+    const FRESH_MAX_MIN   = 10;   // <= 10m → Fresh
+    const STALE_MAX_MIN   = 60;   // 10–60m → Stale
+    // > 60m → Not live
+
+    // --- time helpers ---
+    function parseUTC(t){
+      if(!t) return null;
+      if(typeof t!=="string") return new Date(t);
+      if(t.includes("Z") || /[+\-]\d{2}:\d{2}$/.test(t)) return new Date(t);
+      return new Date(t.replace(" ","T")+"Z");
     }
-    function fmtUTC(t) {
-      const d = parseServerUTC(t);
-      if (!d || isNaN(d)) return "—";
-      return (
-        d.getUTCFullYear() + "-" +
-        String(d.getUTCMonth() + 1).padStart(2,"0") + "-" +
-        String(d.getUTCDate()).padStart(2,"0") + " " +
-        String(d.getUTCHours()).padStart(2,"0") + ":" +
-        String(d.getUTCMinutes()).padStart(2,"0") + ":" +
-        String(d.getUTCSeconds()).padStart(2,"0") + "." +
-        String(d.getUTCMilliseconds()).padStart(3,"0") + " UTC"
-      );
+    function fmtUTCfromDate(d){
+      if(!d || isNaN(d)) return "—";
+      return d.getUTCFullYear()+"-"+
+        String(d.getUTCMonth()+1).padStart(2,"0")+"-"+
+        String(d.getUTCDate()).padStart(2,"0")+" "+
+        String(d.getUTCHours()).padStart(2,"0")+":"+
+        String(d.getUTCMinutes()).padStart(2,"0")+":"+
+        String(d.getUTCSeconds()).padStart(2,"0")+"."+
+        String(d.getUTCMilliseconds()).padStart(3,"0")+" UTC";
     }
-    function timeAgoUTC(t) {
-      const d = parseServerUTC(t);
-      if (!d || isNaN(d)) return "";
-      const diffMs = Date.now() - d.getTime();
-      if (diffMs < 60000) return "just now";
-      const mins = Math.floor(diffMs/60000);
-      if (mins < 60) return mins + " minutes ago";
-      const hrs = Math.floor(mins/60);
-      if (hrs < 24) return hrs + " hours ago";
-      const days = Math.floor(hrs/24);
-      return days + " days ago";
+    const fmtUTC = iso => fmtUTCfromDate(parseUTC(iso));
+    const plural = (w,n)=> n===1?w:w+"s";
+    function relAgoFromDate(d){
+      if(!d || isNaN(d)) return "";
+      const ms = Date.now()-d.getTime();
+      const diff = Math.max(0, ms);
+      if(diff < 60_000) return "1 minute ago";
+      const mins = Math.floor(diff/60_000);
+      if(mins < 60) return `${mins} ${plural("minute",mins)} ago`;
+      const hrs = Math.floor(mins/60), rem = mins%60;
+      return `${hrs} ${plural("hour",hrs)}${rem?` ${rem} ${plural("minute",rem)}`:""} ago`;
     }
-    const fmtNum = n => (n==null || isNaN(n)) ? "—" : Number(n).toLocaleString();
 
-    async function fetchGovernorStats() {
-      try {
-        // always cache-bust silently
-        const url = `${API_URL}?_=${Date.now()}`;
-        const response = await fetch(url, {
-          method: "POST",
-          cache: "no-store",
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
-          },
-          body: JSON.stringify({
-            searchString: GOV_ID,
-            pageNumber: 1,
-            isFullTable: false,
-            isLiveTable: true
-          })
-        });
-
-        // handle non-JSON/null safely
-        let data = null;
-        try { data = await response.json(); } catch { data = null; }
-
-        const governor = data?.kvkDetailsData?.[0];
-        if (!governor) {
-          document.getElementById("output").textContent = "No data found.";
-          document.getElementById("last-updated").textContent = "Last updated: —";
-          return;
-        }
-
-        const serverLast = governor.last_update || data?.last_update;
-        document.getElementById("last-updated").textContent =
-          `Last updated: ${fmtUTC(serverLast)} today (${timeAgoUTC(serverLast)})`;
-
-        const camps = data?.campsList || [];
-        const camp = (camps.find(c => c.id === governor.campid)?.iconName) || "Unknown";
-
-        const output = `
-          <table class="data-table">
-            <tr><th>Rank</th><td>${fmtNum(governor.rank)}</td></tr>
-            <tr><th>Name</th><td>${governor.name} (the best player in the game)</td></tr>
-            <tr><th>Governor ID</th><td>${governor.governor_id}</td></tr>
-            <tr><th>Kingdom</th><td>${governor.kingdom}</td></tr>
-            <tr><th>Camp</th><td>${camp}</td></tr>
-            <tr><th>Min Points</th><td>${fmtNum(governor.min_points)}</td></tr>
-            <tr><th>Max Points</th><td>${fmtNum(governor.max_points)}</td></tr>
-            <tr><th>KP gain (Max - Min)</th><td style="color:red;">${fmtNum(governor.points_difference)}</td></tr>
-            <tr><th>Min Power</th><td>${fmtNum(governor.min_power)}</td></tr>
-            <tr><th>Max Power</th><td>${fmtNum(governor.max_power)}</td></tr>
-            <tr><th>Power Difference</th><td>${fmtNum(governor.power_difference)}</td></tr>
-            <tr><th>First Update (Server)</th><td>${fmtUTC(governor.first_update)}</td></tr>
-            <tr><th>Last Update (Server)</th><td>${fmtUTC(serverLast)}</td></tr>
-            <tr><th>Scan Time (Client UTC)</th><td>${fmtUTC(new Date().toISOString())}</td></tr>
-            <tr><th>Is Premium</th><td>${governor.is_premium ? "Yes" : "No"}</td></tr>
-            <tr><th>KVK Name</th><td>${data?.kvkName || "—"}</td></tr>
-            <tr><th>KVK Story</th><td>${data?.kvkStory || "—"}</td></tr>
-          </table>
-        `;
-        document.getElementById("output").innerHTML = output;
-      } catch (err) {
-        document.getElementById("output").textContent = "Failed to load data.";
-        document.getElementById("last-updated").textContent = "Last updated: —";
-        console.error(err);
+    function freshnessBadge(mins){
+      const badge = document.getElementById("liveBadge");
+      if(mins <= FRESH_MAX_MIN){
+        badge.className = "badge b-fresh";
+        badge.textContent = "LIVE • fresh";
+      }else if(mins <= STALE_MAX_MIN){
+        badge.className = "badge b-stale";
+        badge.textContent = "LIVE • stale";
+      }else{
+        badge.className = "badge b-dead";
+        badge.textContent = "NOT LIVE • data is old";
       }
     }
 
-    fetchGovernorStats();
+    function fmtNum(n){ return (n==null||isNaN(n))?"—":Number(n).toLocaleString(); }
+
+    function tickAges(rawLastISO, scanISO){
+      const last = parseUTC(rawLastISO);
+      const scan = parseUTC(scanISO);
+      // top line ages
+      const lastLine = document.getElementById("lastLine");
+      const mins = Math.floor(Math.max(0, Date.now()-last.getTime())/60_000);
+      freshnessBadge(mins);
+      lastLine.textContent = `Last updated: ${fmtUTCfromDate(last)} (${relAgoFromDate(last)})`;
+      // table inline ages
+      const lastAgo2 = document.getElementById("lastUpdatedAgo2");
+      const scanAgo  = document.getElementById("scanAgo");
+      if(lastAgo2) lastAgo2.textContent = relAgoFromDate(last);
+      if(scanAgo)  scanAgo.textContent  = relAgoFromDate(scan);
+    }
+
+    async function fetchOnce(){
+      const scanTimeISO = new Date().toISOString();
+
+      const resp = await fetch(API_URL, {
+        method: "POST",
+        headers: {"Content-Type":"application/json", "Cache-Control":"no-cache", "Pragma":"no-cache"},
+        cache: "no-store",
+        body: JSON.stringify({
+          searchString: GOV_ID,
+          pageNumber: 1,
+          isFullTable: false,
+          isLiveTable: true
+        })
+      });
+
+      const data = await resp.json();
+      const g = data?.kvkDetailsData?.[0];
+      if(!g){
+        document.getElementById("output").textContent = "No data found.";
+        document.getElementById("lastLine").textContent = "Last updated: —";
+        document.getElementById("liveBadge").className = "badge b-dead";
+        document.getElementById("liveBadge").textContent = "NOT LIVE • no data";
+        return;
+      }
+
+      const serverLastISO = g.last_update || data?.last_update;
+      const lastDate = parseUTC(serverLastISO);
+      const mins = Math.floor(Math.max(0, Date.now()-lastDate.getTime())/60_000);
+      freshnessBadge(mins);
+      document.getElementById("lastLine").textContent =
+        `Last updated: ${fmtUTC(serverLastISO)} (${relAgoFromDate(lastDate)})`;
+
+      const camps = data?.campsList || [];
+      const camp  = (camps.find(c => c.id === g.campid)?.iconName) || "Unknown";
+
+      const html = `
+        <table>
+          <tr><th>Rank</th><td>${fmtNum(g.rank)}</td></tr>
+          <tr><th>Name</th><td>${g.name} (the best player in the game)</td></tr>
+          <tr><th>Governor ID</th><td>${g.governor_id}</td></tr>
+          <tr><th>Kingdom</th><td>${g.kingdom}</td></tr>
+          <tr><th>Camp</th><td>${camp}</td></tr>
+          <tr><th>Min Points</th><td>${fmtNum(g.min_points)}</td></tr>
+          <tr><th>Max Points</th><td>${fmtNum(g.max_points)}</td></tr>
+          <tr><th>KP gain (Max - Min)</th><td class="num-red">${fmtNum(g.points_difference)}</td></tr>
+          <tr><th>Min Power</th><td>${fmtNum(g.min_power)}</td></tr>
+          <tr><th>Max Power</th><td>${fmtNum(g.max_power)}</td></tr>
+          <tr><th>Power Difference</th><td>${fmtNum(g.power_difference)}</td></tr>
+          <tr><th>First Update (Server)</th><td>${fmtUTC(g.first_update)}</td></tr>
+          <tr><th>Last Update (Server)</th><td>${fmtUTC(serverLastISO)} (<span id="lastUpdatedAgo2">${relAgoFromDate(lastDate)}</span>)</td></tr>
+          <tr><th>Scan Time (Client UTC)</th><td>${fmtUTC(scanTimeISO)} (<span id="scanAgo">${relAgoFromDate(parseUTC(scanTimeISO))}</span>)</td></tr>
+          <tr><th>Is Premium</th><td>${g.is_premium ? "Yes" : "No"}</td></tr>
+          <tr><th>KVK Name</th><td>${data?.kvkName || "—"}</td></tr>
+          <tr><th>KVK Story</th><td>${data?.kvkStory || "—"}</td></tr>
+        </table>
+        <div class="muted" style="margin-top:8px;">
+          Note: “Last updated” uses the per-governor <code>last_update</code> from the live table. If this shows old data, the live feed for this KVK/player is likely paused upstream.
+        </div>
+      `;
+      document.getElementById("output").innerHTML = html;
+
+      // keep ages ticking
+      tickAges(serverLastISO, scanTimeISO);
+      setInterval(() => tickAges(serverLastISO, scanTimeISO), 10_000);
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", () => {
+      // simple reload of live call; no cache-buster param used
+      fetchOnce().catch(console.error);
+    });
+
+    fetchOnce().catch(console.error);
   </script>
 </body>
 </html>
